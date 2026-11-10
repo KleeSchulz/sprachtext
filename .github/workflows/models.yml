@@ -8,7 +8,6 @@ on:
     paths:
       - .github/workflows/models.yml
 
-
 permissions:
   contents: write
 
@@ -61,14 +60,16 @@ jobs:
       - name: In ggml umwandeln und komprimieren (q5_0)
         run: |
           mkdir -p /tmp/out
-          python /tmp/whisper.cpp/models/convert-h5-to-ggml.py /tmp/hf-model /tmp/openai-whisper /tmp/out
-          ls -la /tmp/out
-          /tmp/whisper.cpp/build/bin/whisper-quantize /tmp/out/ggml-model.bin /tmp/out/ggml-large-v3-turbo-german-q5_0.bin q5_0
+          set -o pipefail
+          ls -la /tmp/hf-model | tee /tmp/step.log
+          python /tmp/whisper.cpp/models/convert-h5-to-ggml.py /tmp/hf-model /tmp/openai-whisper /tmp/out 2>&1 | tail -n 60 | tee -a /tmp/step.log
+          ls -la /tmp/out | tee -a /tmp/step.log
+          /tmp/whisper.cpp/build/bin/whisper-quantize /tmp/out/ggml-model.bin /tmp/out/ggml-large-v3-turbo-german-q5_0.bin q5_0 2>&1 | tail -n 30 | tee -a /tmp/step.log
           ls -la /tmp/out
 
       - name: Fehlerhinweis
         if: failure()
-        run: echo "::error::Siehe Log des fehlgeschlagenen Schritts"
+        run: tail -n 40 /tmp/step.log 2>/dev/null | while IFS= read -r l; do echo "::error::$l"; done
 
       - name: Als Release "models" bereitstellen
         env:
