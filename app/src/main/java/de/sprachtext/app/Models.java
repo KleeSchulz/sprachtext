@@ -17,18 +17,20 @@ final class Models {
             "tiny", "tiny-de", "base", "small", "small-de", "small-de-cv",
             "medium", "distil-de", "turbo", "turbo-de"
     };
+    // Sterne = Eignung für Deutsch (eigene Einschätzung), danach Tempo und Größe
     static final String[] LABELS = {
-            "Tiny – sehr schnell, ungenau (~31 MB)",
-            "Tiny Deutsch – sehr schnell (~45 MB)",
-            "Base – schnell (~57 MB)",
-            "Small – Mittelweg (~181 MB)",
-            "Small Deutsch (vilassn) – Mittelweg (~190 MB)",
-            "Small Deutsch CV (bofenghuang) – Mittelweg (~190 MB)",
-            "Medium – gut, langsam (~514 MB)",
-            "Distil Deutsch – sehr gut, langsam (~530 MB)",
-            "Large-v3-Turbo – sehr gut, langsam (~547 MB)",
-            "Turbo Deutsch – am genauesten, langsam (~574 MB)"
+            "Tiny · Deutsch ★☆☆☆☆ ungeeignet · sehr schnell · 31 MB",
+            "Tiny Deutsch · ★★☆☆☆ bedingt · sehr schnell · 42 MB",
+            "Base · ★★☆☆☆ bedingt · schnell · 57 MB",
+            "Small · ★★★☆☆ gut · mittel · 181 MB",
+            "Small Deutsch (vilassn) · ★★★☆☆ gut · mittel · 181 MB",
+            "Small Deutsch CV · ★★★☆☆ gut · mittel · 181 MB",
+            "Medium · ★★★★☆ sehr gut · langsam · 514 MB",
+            "Distil Deutsch · ★★★★☆ sehr gut · langsam · 513 MB",
+            "Turbo · ★★★★☆ sehr gut · langsam · 547 MB",
+            "Turbo Deutsch · ★★★★★ am besten (empfohlen) · langsam · 547 MB"
     };
+
     private static final String[] FILES = {
             "ggml-tiny-q5_1.bin", "ggml-tiny-german-q8_0.bin", "ggml-base-q5_1.bin", "ggml-small-q5_1.bin",
             "ggml-small-german-vilassn-q5_1.bin", "ggml-small-german-cv11-q5_1.bin",
