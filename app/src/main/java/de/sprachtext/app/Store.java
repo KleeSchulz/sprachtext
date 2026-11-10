@@ -44,7 +44,7 @@ final class Store {
             h.put(new JSONObject().put("t", System.currentTimeMillis()).put("text", text)
                     .put("secs", secs).put("audio", audioSecs));
             for (int i = 0; i < old.length() && h.length() < 20; i++) h.put(old.get(i));
-            p(c).edit().putString("history", h.toString()).apply();
+            p(c).edit().putString("history", h.toString()).commit(); // sofort auf Platte, falls der Prozess danach beendet wird
         } catch (Exception ignored) { }
     }
 

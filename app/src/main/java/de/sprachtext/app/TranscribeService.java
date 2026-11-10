@@ -104,7 +104,7 @@ public class TranscribeService extends Service {
         if (intent != null && ACTION_CANCEL.equals(intent.getAction())) {
             cancelAll = true;
             synchronized (QUEUE) {
-                for (Job j : QUEUE) new File(j.file).delete();
+                for (Job j : QUEUE) deleteJob(j.file);
                 QUEUE.clear();
             }
             Whisper.cancel();
@@ -158,7 +158,7 @@ public class TranscribeService extends Service {
             Job job;
             synchronized (QUEUE) { job = QUEUE.poll(); }
             if (job == null) break;
-            if (cancelAll) { new File(job.file).delete(); continue; }
+            if (cancelAll) { deleteJob(job.file); continue; }
             batchIndex++;
             try {
                 String text = runJob(job);
@@ -169,7 +169,7 @@ public class TranscribeService extends Service {
                 lastError = "Fehler: " + (e.getMessage() == null ? e.toString() : e.getMessage());
                 done.add(new String[]{job.name, "(" + lastError + ")"});
             } finally {
-                new File(job.file).delete();
+                deleteJob(job.file);
             }
         }
 
@@ -336,6 +336,17 @@ public class TranscribeService extends Service {
         STATE.progress = String.format(Locale.GERMANY, "100 %% · %s gesamt (Erkennung %.1f s)", clock(secs), whisperSecs);
         changed();
         return text;
+    }
+
+    static void deleteJob(String file) {
+        new File(file).delete();
+        new File(file + ".name").delete();
+    }
+
+    /** App aus der Übersicht gewischt: Dienst läuft weiter (sofern der Hersteller ihn lässt). */
+    @Override
+    public void onTaskRemoved(Intent rootIntent) {
+        super.onTaskRemoved(rootIntent);
     }
 
     private void checkCancel() throws CancelledException {

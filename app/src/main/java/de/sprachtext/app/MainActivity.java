@@ -11,6 +11,8 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.PowerManager;
+import android.provider.Settings;
 import android.provider.OpenableColumns;
 import android.view.View;
 import android.view.WindowManager;
@@ -30,6 +32,10 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.FileReader;
+import java.io.FileWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.util.Arrays;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.text.DateFormat;
@@ -87,8 +93,11 @@ public class MainActivity extends Activity implements TranscribeService.Listener
             w.setVisibility(View.VISIBLE);
         }
 
+        findViewById(R.id.battery).setOnClickListener(v -> askBatteryExemption());
+
         renderHistory();
         renderInfo();
+        resumeInterrupted();
         handleIntent(getIntent());
     }
 
@@ -106,6 +115,8 @@ public class MainActivity extends Activity implements TranscribeService.Listener
         TranscribeService.uiVisible = true;
         getSystemService(NotificationManager.class).cancel(TranscribeService.ID_DONE);
         onStateChanged();
+        renderHistory(); // falls im Hintergrund etwas fertig geworden ist
+        renderBattery();
     }
 
     @Override
@@ -193,6 +204,7 @@ public class MainActivity extends Activity implements TranscribeService.Listener
                         int n;
                         while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
                     }
+                    try (FileWriter w = new FileWriter(out.getPath() + ".name")) { w.write(name); }
                     runOnUiThread(() -> startForegroundService(new Intent(this, TranscribeService.class)
                             .putExtra(TranscribeService.EXTRA_FILE, out.getPath())
                             .putExtra(TranscribeService.EXTRA_NAME, name)));
@@ -210,6 +222,48 @@ public class MainActivity extends Activity implements TranscribeService.Listener
                 }
             });
         }).start();
+    }
+
+    /**
+     * Falls die App (bzw. der Dienst) während einer Transkription beendet wurde,
+     * liegen die Dateien noch im Ordner "jobs" → automatisch erneut einreihen.
+     */
+    private void resumeInterrupted() {
+        if (TranscribeService.STATE.running) return;
+        File[] files = new File(getFilesDir(), "jobs").listFiles((d, n) -> n.startsWith("audio-") && !n.endsWith(".name"));
+        if (files == null || files.length == 0) return;
+        Arrays.sort(files, (a, b) -> a.getName().compareTo(b.getName()));
+        for (File f : files) {
+            String name = "Sprachnachricht";
+            try {
+                File nf = new File(f.getPath() + ".name");
+                if (nf.exists()) name = new String(Files.readAllBytes(nf.toPath()), StandardCharsets.UTF_8);
+            } catch (Exception ignored) { }
+            startForegroundService(new Intent(this, TranscribeService.class)
+                    .putExtra(TranscribeService.EXTRA_FILE, f.getPath())
+                    .putExtra(TranscribeService.EXTRA_NAME, name));
+        }
+        Toast.makeText(this, "Unterbrochene Transkription wird fortgesetzt", Toast.LENGTH_LONG).show();
+    }
+
+    // ---------- Akku-Optimierung ----------
+
+    private boolean batteryExempt() {
+        PowerManager pm = getSystemService(PowerManager.class);
+        return pm.isIgnoringBatteryOptimizations(getPackageName());
+    }
+
+    private void renderBattery() {
+        findViewById(R.id.batteryBox).setVisibility(batteryExempt() ? View.GONE : View.VISIBLE);
+    }
+
+    private void askBatteryExemption() {
+        try {
+            startActivity(new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                    .setData(Uri.parse("package:" + getPackageName())));
+        } catch (Exception e) {
+            startActivity(new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS));
+        }
     }
 
     private String displayName(Uri uri) {

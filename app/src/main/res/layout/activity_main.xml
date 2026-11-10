@@ -31,6 +31,25 @@
             android:textColor="@color/err"
             android:visibility="gone" />
 
+        <!-- Hinweis Akku-Optimierung -->
+        <LinearLayout
+            android:id="@+id/batteryBox"
+            style="@style/Card"
+            android:visibility="gone">
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Damit die Transkription auch nach dem Schließen der App weiterläuft, sollte die Akku-Optimierung für Sprachtext ausgeschaltet sein."
+                android:textColor="@color/muted"
+                android:textSize="13sp" />
+            <Button
+                android:id="@+id/battery"
+                style="@style/Btn"
+                android:layout_width="match_parent"
+                android:layout_marginTop="10dp"
+                android:text="Akku-Optimierung ausschalten" />
+        </LinearLayout>
+
         <!-- Eingabe -->
         <LinearLayout style="@style/Card">
             <Button
