@@ -1,0 +1,46 @@
+:root {
+  --bg: #0f1412; --card: #18201d; --line: #2a3530; --text: #e8efe9;
+  --muted: #94a39a; --accent: #25d366; --accent-ink: #062b15; --err: #ff7a6b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom);
+}
+header { padding: 20px 16px 4px; }
+h1 { margin: 0; font-size: 1.5rem; }
+h2 { margin: 0 0 8px; font-size: 1rem; color: var(--muted); }
+.sub { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+main { padding: 8px 12px 32px; max-width: 640px; margin: 0 auto; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 10px 0; }
+.hidden { display: none; }
+.btn {
+  display: inline-block; border: 1px solid var(--line); background: transparent; color: var(--text);
+  padding: 11px 16px; border-radius: 10px; font: inherit; cursor: pointer; text-align: center;
+}
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.small { padding: 6px 10px; font-size: .85rem; }
+#drop .btn { width: 100%; }
+.hint { color: var(--muted); font-size: .85rem; margin: 10px 0 0; }
+.status { font-weight: 600; }
+.status.err { color: var(--err); }
+.bar { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; margin: 10px 0 6px; }
+#barfill { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+#barfill.indet { width: 30%; animation: slide 1.2s infinite ease-in-out; }
+@keyframes slide { 0% { margin-left: -30%; } 100% { margin-left: 100%; } }
+.meta { color: var(--muted); font-size: .85rem; }
+textarea {
+  width: 100%; background: var(--bg); color: var(--text); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px; font: inherit; resize: vertical;
+}
+.row { display: flex; gap: 8px; margin-top: 10px; }
+.row .btn { flex: 1; }
+details summary { cursor: pointer; font-weight: 600; }
+label { display: block; margin-top: 12px; color: var(--muted); font-size: .9rem; }
+select { display: block; width: 100%; margin-top: 4px; padding: 10px; border-radius: 10px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--line); font: inherit; }
+label.check { display: flex; gap: 8px; align-items: center; }
+#history { list-style: none; padding: 0; margin: 0 0 10px; }
+#history li { border-top: 1px solid var(--line); padding: 8px 0; font-size: .9rem; cursor: pointer; }
+#history li small { display: block; color: var(--muted); }
