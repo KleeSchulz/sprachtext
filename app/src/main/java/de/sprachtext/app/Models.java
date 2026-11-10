@@ -12,22 +12,26 @@ import java.net.URL;
 /** Whisper-Modelle (ggml, quantisiert) – einmal herunterladen, dann fest im App-Speicher. */
 final class Models {
 
-    static final String[] KEYS   = {"tiny", "base", "small", "turbo"};
+    static final String[] KEYS   = {"tiny", "base", "small", "turbo", "turbo-de"};
     static final String[] LABELS = {
             "Tiny – sehr schnell, ungenau (~31 MB)",
             "Base – Standard (~57 MB)",
             "Small – gut für Deutsch (~181 MB)",
-            "Large-v3-Turbo – beste Qualität, langsam (~547 MB)"
+            "Large-v3-Turbo – sehr gut, langsam (~547 MB)",
+            "Turbo Deutsch – am genauesten für Deutsch, langsam (~547 MB)"
     };
     private static final String[] FILES = {
-            "ggml-tiny-q5_1.bin", "ggml-base-q5_1.bin", "ggml-small-q5_1.bin", "ggml-large-v3-turbo-q5_0.bin"
+            "ggml-tiny-q5_1.bin", "ggml-base-q5_1.bin", "ggml-small-q5_1.bin", "ggml-large-v3-turbo-q5_0.bin",
+            "ggml-large-v3-turbo-german-q5_0.bin"
     };
     private static final String BASE_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
+    /** Deutsch trainiertes Turbo-Modell (primeline), von uns umgewandelt und im eigenen Repo bereitgestellt. */
+    private static final String OWN_URL = "https://github.com/KleeSchulz/sprachtext/releases/download/models/";
     private static final String VAD_FILE = "ggml-silero-v6.2.0.bin";
     private static final String VAD_URL = "https://huggingface.co/ggml-org/whisper-vad/resolve/main/" + VAD_FILE;
 
     /** Grobe Startwerte: Rechensekunden pro Sekunde Sprache (wird nach jedem Lauf angepasst). */
-    static final double[] DEFAULT_SPEED = {0.08, 0.15, 0.45, 1.5};
+    static final double[] DEFAULT_SPEED = {0.08, 0.15, 0.45, 1.5, 1.5};
 
     interface Progress { void on(long loaded, long total); }
 
@@ -61,7 +65,8 @@ final class Models {
 
     /** Lädt das Modell, falls noch nicht vorhanden. Schreibt erst in .part, dann umbenennen. */
     static File ensure(Context c, String key, Progress progress) throws Exception {
-        return download(BASE_URL + FILES[index(key)], file(c, key), 1_000_000, progress);
+        String base = key.equals("turbo-de") ? OWN_URL : BASE_URL;
+        return download(base + FILES[index(key)], file(c, key), 1_000_000, progress);
     }
 
     private static File download(String url, File target, long minSize, Progress progress) throws Exception {

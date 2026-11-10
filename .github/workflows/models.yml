@@ -8,6 +8,7 @@ on:
     paths:
       - .github/workflows/models.yml
 
+
 permissions:
   contents: write
 
@@ -37,7 +38,12 @@ jobs:
 
       - name: Modell herunterladen (primeline/whisper-large-v3-turbo-german)
         run: |
-          huggingface-cli download primeline/whisper-large-v3-turbo-german --local-dir /tmp/hf-model
+          python - <<'EOF'
+          from huggingface_hub import snapshot_download
+          snapshot_download("primeline/whisper-large-v3-turbo-german", local_dir="/tmp/hf-model",
+                            allow_patterns=["*.json", "*.txt", "*.safetensors", "*.bin", "*.model"],
+                            ignore_patterns=["*onnx*", "*.msgpack", "*.h5", "*.ot"])
+          EOF
           ls -la /tmp/hf-model
           cd /tmp/hf-model
           # Das Konvertierungsskript braucht vocab.json und added_tokens.json
@@ -59,6 +65,10 @@ jobs:
           ls -la /tmp/out
           /tmp/whisper.cpp/build/bin/whisper-quantize /tmp/out/ggml-model.bin /tmp/out/ggml-large-v3-turbo-german-q5_0.bin q5_0
           ls -la /tmp/out
+
+      - name: Fehlerhinweis
+        if: failure()
+        run: echo "::error::Siehe Log des fehlgeschlagenen Schritts"
 
       - name: Als Release "models" bereitstellen
         env:
