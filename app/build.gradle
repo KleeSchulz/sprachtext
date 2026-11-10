@@ -10,8 +10,8 @@ android {
         applicationId 'de.sprachtext.app'
         minSdk 26
         targetSdk 34
-        versionCode 5
-        versionName '2.2'
+        versionCode 6
+        versionName '2.3'
 
         ndk {
             abiFilters 'arm64-v8a'
@@ -25,9 +25,24 @@ android {
         }
     }
 
+    // Fester Schlüssel, damit jede neue APK über die alte installiert werden kann.
+    // Nur für die private Test-Version gedacht – für den Play Store gäbe es einen eigenen, geheimen Schlüssel.
+    signingConfigs {
+        fixed {
+            storeFile file('sprachtext.keystore')
+            storePassword 'sprachtext'
+            keyAlias 'sprachtext'
+            keyPassword 'sprachtext'
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.fixed
+        }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.fixed
         }
     }
 
