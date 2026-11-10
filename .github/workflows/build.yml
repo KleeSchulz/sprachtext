@@ -19,6 +19,24 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Whisper-Bibliothek in die App packen (offline nutzbar)
+        run: |
+          set -e
+          mkdir -p /tmp/tf && cd /tmp/tf
+          npm init -y >/dev/null
+          npm install --no-audit --no-fund @huggingface/transformers@3
+          LIB="$GITHUB_WORKSPACE/app/src/main/assets/web/lib"
+          mkdir -p "$LIB"
+          cp node_modules/@huggingface/transformers/dist/transformers.min.js "$LIB/"
+          # ONNX-Runtime-WASM-Dateien (je nach Version in transformers/dist oder onnxruntime-web/dist)
+          find node_modules -path '*dist*' \( -name 'ort-wasm*.wasm' -o -name 'ort-wasm*.mjs' \) -exec cp {} "$LIB/" \;
+          ls -la "$LIB"
+          ls "$LIB"/*.wasm >/dev/null
+
       - name: Debug-APK bauen
         run: gradle assembleDebug
 

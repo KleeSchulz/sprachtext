@@ -1,6 +1,11 @@
 package de.sprachtext.app;
 
+import android.Manifest;
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -17,6 +22,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.view.WindowManager;
 import android.widget.Toast;
 
 import androidx.webkit.WebViewAssetLoader;
@@ -36,6 +42,7 @@ public class MainActivity extends Activity {
 
     private WebView web;
     private ValueCallback<Uri[]> fileCallback;
+    private boolean visible = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,11 +70,23 @@ public class MainActivity extends Activity {
         s.setCacheMode(WebSettings.LOAD_DEFAULT);
 
         web.addJavascriptInterface(new Bridge(), "AndroidBridge");
+        // Rechenprozess der WebView auch im Hintergrund nicht herunterstufen
+        web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
+        TranscribeService.createChannels(this);
 
         web.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
-                return loader.shouldInterceptRequest(request.getUrl());
+                WebResourceResponse r = loader.shouldInterceptRequest(request.getUrl());
+                if (r != null) {
+                    // Korrekte MIME-Typen, sonst lädt die WebView .mjs/.wasm nicht als Modul/WebAssembly
+                    String path = request.getUrl().getPath();
+                    if (path != null) {
+                        if (path.endsWith(".mjs") || path.endsWith(".js")) r.setMimeType("text/javascript");
+                        else if (path.endsWith(".wasm")) r.setMimeType("application/wasm");
+                    }
+                }
+                return r;
             }
         });
 
@@ -166,6 +185,19 @@ public class MainActivity extends Activity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        visible = true;
+        getSystemService(NotificationManager.class).cancel(TranscribeService.ID_DONE);
+    }
+
+    @Override
+    protected void onPause() {
+        visible = false;
+        super.onPause();
+    }
+
+    @Override
     public void onBackPressed() {
         if (web != null && web.canGoBack()) web.goBack();
         else super.onBackPressed();
@@ -179,6 +211,44 @@ public class MainActivity extends Activity {
                 ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
                 cm.setPrimaryClip(ClipData.newPlainText("Transkript", text));
                 Toast.makeText(MainActivity.this, "Kopiert", Toast.LENGTH_SHORT).show();
+            });
+        }
+
+        /** Transkription startet: Vordergrunddienst + Bildschirm wach halten. */
+        @JavascriptInterface
+        public void busyStart() {
+            runOnUiThread(() -> {
+                if (Build.VERSION.SDK_INT >= 33
+                        && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 7);
+                }
+                getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                try {
+                    startForegroundService(new Intent(MainActivity.this, TranscribeService.class));
+                } catch (Exception ignored) { }
+            });
+        }
+
+        /** Transkription beendet: Dienst stoppen, ggf. Fertig-Benachrichtigung. */
+        @JavascriptInterface
+        public void busyEnd(final String text, final boolean ok) {
+            runOnUiThread(() -> {
+                getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                stopService(new Intent(MainActivity.this, TranscribeService.class));
+                if (!visible) {
+                    String body = text == null ? "" : text;
+                    Notification n = new Notification.Builder(MainActivity.this, TranscribeService.CHANNEL_DONE)
+                            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+                            .setContentTitle(ok ? "Transkript fertig" : "Transkription fehlgeschlagen")
+                            .setContentText(body)
+                            .setStyle(new Notification.BigTextStyle().bigText(body))
+                            .setAutoCancel(true)
+                            .setContentIntent(TranscribeService.openApp(MainActivity.this))
+                            .build();
+                    try {
+                        getSystemService(NotificationManager.class).notify(TranscribeService.ID_DONE, n);
+                    } catch (Exception ignored) { }
+                }
             });
         }
 

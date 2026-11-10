@@ -44,6 +44,7 @@ worker.onmessage = (e) => {
     els.meta.textContent = `${mb(loaded)} / ${mb(total)} MB`;
   } else if (m.type === 'result') {
     busy = false;
+    nativeEnd(m.text || '(kein Text erkannt)', true);
     setBar(1);
     setStatus('Fertig');
     els.meta.textContent = `${m.seconds.toFixed(1)} s · ${m.device}`;
@@ -51,10 +52,15 @@ worker.onmessage = (e) => {
     addHistory(m.text);
   } else if (m.type === 'error') {
     busy = false;
+    nativeEnd(m.message, false);
     setStatus('Fehler: ' + m.message, true);
     setBar(0);
   }
 };
+
+// ---------- Hintergrunddienst (nur Android-App) ----------
+function nativeStart() { if (NATIVE && window.AndroidBridge.busyStart) try { window.AndroidBridge.busyStart(); } catch {} }
+function nativeEnd(text, ok) { if (NATIVE && window.AndroidBridge.busyEnd) try { window.AndroidBridge.busyEnd(String(text || ''), ok); } catch {} }
 
 // ---------- UI-Helfer ----------
 function setStatus(t, err = false) {
@@ -102,6 +108,7 @@ async function processFile(blob, name = '') {
     const audio = await decodeTo16kMono(blob);
     const secs = audio.length / 16000;
     els.meta.textContent = `${name ? name + ' · ' : ''}${fmtDur(secs)}`;
+    nativeStart();
     worker.postMessage({
       type: 'transcribe', audio, model: els.model.value,
       language: els.lang.value, preferGPU: els.gpu.checked

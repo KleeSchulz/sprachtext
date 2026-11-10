@@ -1,7 +1,10 @@
 // Web Worker: Whisper lokal im Browser (transformers.js)
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3';
+// Bibliothek liegt fest in der App (lib/), wird beim Build mitgeliefert → offline nutzbar
+import { pipeline, env } from './lib/transformers.min.js';
 
 env.allowLocalModels = false;
+// ONNX-Runtime-Dateien (.wasm/.mjs) ebenfalls lokal statt vom CDN laden
+env.backends.onnx.wasm.wasmPaths = new URL('./lib/', self.location.href).href;
 env.useBrowserCache = true; // Modell wird nach dem ersten Download im Browser gespeichert
 
 let asr = null;

@@ -4,3 +4,6 @@ app/build/
 local.properties
 .idea/
 *.iml
+
+# wird beim Build erzeugt
+app/src/main/assets/web/lib/
