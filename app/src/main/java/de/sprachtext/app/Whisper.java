@@ -16,7 +16,12 @@ final class Whisper {
     static native void free(long ctx);
     static native void cancel();
     static native String systemInfo();
-    static native byte[] transcribe(long ctx, float[] audio16kMono, String language, int threads, Listener listener);
+    static native byte[] transcribe(long ctx, float[] audio16kMono, String language, int threads, int audioCtx, Listener listener);
+
+    static native long vadInit(String modelPath, int threads);
+    static native void vadFree(long vad);
+    /** Nur die Sprachabschnitte (Stille entfernt). Leer = keine Sprache, null = Fehler. */
+    static native float[] vadCompact(long vad, float[] audio16kMono);
 
     private Whisper() { }
 }

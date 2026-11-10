@@ -2,6 +2,7 @@
 #include <jni.h>
 #include <atomic>
 #include <string>
+#include <vector>
 #include <android/log.h>
 #include "whisper.h"
 
@@ -67,6 +68,62 @@ Java_de_sprachtext_app_Whisper_cancel(JNIEnv *, jclass) {
     g_cancel.store(true);
 }
 
+// ---------- Sprach-/Stille-Erkennung (VAD, Silero) ----------
+
+extern "C" JNIEXPORT jlong JNICALL
+Java_de_sprachtext_app_Whisper_vadInit(JNIEnv *env, jclass, jstring path, jint threads) {
+    const char *p = env->GetStringUTFChars(path, nullptr);
+    whisper_vad_context_params vp = whisper_vad_default_context_params();
+    vp.n_threads = threads;
+    vp.use_gpu = false;
+    whisper_vad_context *v = whisper_vad_init_from_file_with_params(p, vp);
+    env->ReleaseStringUTFChars(path, p);
+    return (jlong) v;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_de_sprachtext_app_Whisper_vadFree(JNIEnv *, jclass, jlong v) {
+    if (v) whisper_vad_free((whisper_vad_context *) v);
+}
+
+/**
+ * Schneidet Stille heraus: gibt nur die Sprachabschnitte zurück, getrennt durch 0,1 s Pause.
+ * Leeres Array = keine Sprache gefunden, null = Fehler.
+ */
+extern "C" JNIEXPORT jfloatArray JNICALL
+Java_de_sprachtext_app_Whisper_vadCompact(JNIEnv *env, jclass, jlong vptr, jfloatArray audio) {
+    auto *v = (whisper_vad_context *) vptr;
+    if (!v) return nullptr;
+    jsize n = env->GetArrayLength(audio);
+    jfloat *data = env->GetFloatArrayElements(audio, nullptr);
+
+    whisper_vad_params vp = whisper_vad_default_params();
+    vp.speech_pad_ms = 200;          // etwas Luft vor/nach jedem Abschnitt, damit nichts abgeschnitten wird
+    vp.min_silence_duration_ms = 300;
+    whisper_vad_segments *segs = whisper_vad_segments_from_samples(v, vp, data, n);
+    if (!segs) { env->ReleaseFloatArrayElements(audio, data, JNI_ABORT); return nullptr; }
+
+    std::vector<float> out;
+    const int gap = 1600; // 0,1 s bei 16 kHz
+    const int ns = whisper_vad_segments_n_segments(segs);
+    for (int i = 0; i < ns; i++) {
+        // Zeiten sind in Hundertstelsekunden → Samples (×160)
+        long a = (long) (whisper_vad_segments_get_segment_t0(segs, i) * 160.0f);
+        long b = (long) (whisper_vad_segments_get_segment_t1(segs, i) * 160.0f);
+        if (a < 0) a = 0;
+        if (b > n) b = n;
+        if (b <= a) continue;
+        if (!out.empty()) out.insert(out.end(), gap, 0.0f);
+        out.insert(out.end(), data + a, data + b);
+    }
+    whisper_vad_free_segments(segs);
+    env->ReleaseFloatArrayElements(audio, data, JNI_ABORT);
+
+    jfloatArray res = env->NewFloatArray((jsize) out.size());
+    if (!out.empty()) env->SetFloatArrayRegion(res, 0, (jsize) out.size(), out.data());
+    return res;
+}
+
 extern "C" JNIEXPORT jstring JNICALL
 Java_de_sprachtext_app_Whisper_systemInfo(JNIEnv *env, jclass) {
     return env->NewStringUTF(whisper_print_system_info());
@@ -75,7 +132,7 @@ Java_de_sprachtext_app_Whisper_systemInfo(JNIEnv *env, jclass) {
 /** Gibt den Text als UTF-8-Bytes zurück, oder null bei Fehler/Abbruch. */
 extern "C" JNIEXPORT jbyteArray JNICALL
 Java_de_sprachtext_app_Whisper_transcribe(JNIEnv *env, jclass, jlong ctxPtr, jfloatArray audio,
-                                          jstring lang, jint threads, jobject listener) {
+                                          jstring lang, jint threads, jint audioCtx, jobject listener) {
     auto *ctx = (whisper_context *) ctxPtr;
     if (!ctx) return nullptr;
     g_cancel.store(false);
@@ -93,6 +150,7 @@ Java_de_sprachtext_app_Whisper_transcribe(JNIEnv *env, jclass, jlong ctxPtr, jfl
     p.n_threads = threads;
     p.language = language.c_str();
     p.translate = false;
+    p.audio_ctx = audioCtx; // 0 = Standard (30 s); kleiner = schneller bei kurzen Aufnahmen
     p.no_context = true;
     p.print_progress = false;
     p.print_realtime = false;

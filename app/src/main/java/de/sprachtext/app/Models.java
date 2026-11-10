@@ -23,6 +23,11 @@ final class Models {
             "ggml-tiny-q5_1.bin", "ggml-base-q5_1.bin", "ggml-small-q5_1.bin", "ggml-large-v3-turbo-q5_0.bin"
     };
     private static final String BASE_URL = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
+    private static final String VAD_FILE = "ggml-silero-v6.2.0.bin";
+    private static final String VAD_URL = "https://huggingface.co/ggml-org/whisper-vad/resolve/main/" + VAD_FILE;
+
+    /** Grobe Startwerte: Rechensekunden pro Sekunde Sprache (wird nach jedem Lauf angepasst). */
+    static final double[] DEFAULT_SPEED = {0.08, 0.15, 0.45, 1.5};
 
     interface Progress { void on(long loaded, long total); }
 
@@ -31,10 +36,23 @@ final class Models {
         return 1;
     }
 
-    static File file(Context c, String key) {
+    private static File dir(Context c) {
         File dir = new File(c.getFilesDir(), "models");
         dir.mkdirs();
-        return new File(dir, FILES[index(key)]);
+        return dir;
+    }
+
+    static File file(Context c, String key) {
+        return new File(dir(c), FILES[index(key)]);
+    }
+
+    static File vadFile(Context c) {
+        return new File(dir(c), VAD_FILE);
+    }
+
+    /** Kleines VAD-Modell (~1 MB) für das Erkennen von Stille. */
+    static File ensureVad(Context c) throws Exception {
+        return download(VAD_URL, vadFile(c), 100_000, (l, t) -> { });
     }
 
     static boolean isDownloaded(Context c, String key) {
@@ -43,10 +61,13 @@ final class Models {
 
     /** Lädt das Modell, falls noch nicht vorhanden. Schreibt erst in .part, dann umbenennen. */
     static File ensure(Context c, String key, Progress progress) throws Exception {
-        File target = file(c, key);
-        if (target.length() > 1_000_000) return target;
+        return download(BASE_URL + FILES[index(key)], file(c, key), 1_000_000, progress);
+    }
+
+    private static File download(String url, File target, long minSize, Progress progress) throws Exception {
+        if (target.length() > minSize) return target;
         File part = new File(target.getPath() + ".part");
-        HttpURLConnection con = (HttpURLConnection) new URL(BASE_URL + FILES[index(key)]).openConnection();
+        HttpURLConnection con = (HttpURLConnection) new URL(url).openConnection();
         con.setInstanceFollowRedirects(true);
         con.setConnectTimeout(20_000);
         con.setReadTimeout(60_000);

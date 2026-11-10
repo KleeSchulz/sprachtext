@@ -44,7 +44,7 @@ public class MainActivity extends Activity implements TranscribeService.Listener
     private static final String[] LANG_LABELS = {"Deutsch", "Automatisch erkennen", "Englisch"};
 
     private View work, result, historyBox;
-    private TextView status, meta, partial;
+    private TextView status, meta, partial, progressText;
     private ProgressBar bar;
     private EditText text;
     private LinearLayout history;
@@ -62,6 +62,7 @@ public class MainActivity extends Activity implements TranscribeService.Listener
         historyBox = findViewById(R.id.historyBox);
         status = findViewById(R.id.status);
         meta = findViewById(R.id.meta);
+        progressText = findViewById(R.id.progressText);
         partial = findViewById(R.id.partial);
         bar = findViewById(R.id.bar);
         text = findViewById(R.id.text);
@@ -120,6 +121,7 @@ public class MainActivity extends Activity implements TranscribeService.Listener
         Intent i = new Intent(Intent.ACTION_GET_CONTENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("audio/*");
+        i.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true);
         try {
             startActivityForResult(Intent.createChooser(i, "Audiodatei wählen"), REQ_FILE);
         } catch (Exception e) {
@@ -129,8 +131,15 @@ public class MainActivity extends Activity implements TranscribeService.Listener
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == REQ_FILE && resultCode == RESULT_OK && data != null && data.getData() != null) {
-            startJob(data.getData());
+        if (requestCode == REQ_FILE && resultCode == RESULT_OK && data != null
+                && (data.getData() != null || data.getClipData() != null)) {
+            ArrayList<Uri> uris = new ArrayList<>();
+            if (data.getClipData() != null) {
+                for (int i = 0; i < data.getClipData().getItemCount(); i++) uris.add(data.getClipData().getItemAt(i).getUri());
+            } else {
+                uris.add(data.getData());
+            }
+            startJobs(uris);
             return;
         }
         super.onActivityResult(requestCode, resultCode, data);
@@ -139,56 +148,67 @@ public class MainActivity extends Activity implements TranscribeService.Listener
     private void handleIntent(Intent intent) {
         if (intent == null) return;
         String action = intent.getAction();
-        Uri uri = null;
+        ArrayList<Uri> uris = new ArrayList<>();
         if (Intent.ACTION_SEND.equals(action)) {
-            uri = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            Uri u = intent.getParcelableExtra(Intent.EXTRA_STREAM);
+            if (u != null) uris.add(u);
         } else if (Intent.ACTION_SEND_MULTIPLE.equals(action)) {
             ArrayList<Uri> list = intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM);
-            if (list != null && !list.isEmpty()) uri = list.get(0);
+            if (list != null) for (Uri u : list) if (u != null) uris.add(u);
         } else if (Intent.ACTION_VIEW.equals(action)) {
-            uri = intent.getData();
+            if (intent.getData() != null) uris.add(intent.getData());
         }
         intent.setAction(null); // nicht erneut verarbeiten (z. B. nach Drehen)
-        if (uri != null) startJob(uri);
+        if (!uris.isEmpty()) startJobs(uris);
     }
 
-    /** Kopiert die Datei in den App-Speicher und startet den Dienst. */
-    private void startJob(Uri uri) {
-        if (TranscribeService.STATE.running) {
-            Toast.makeText(this, "Es läuft bereits eine Transkription", Toast.LENGTH_SHORT).show();
-            return;
-        }
+    /** Kopiert die Dateien in den App-Speicher und reiht sie im Dienst ein (Reihenfolge bleibt erhalten). */
+    private void startJobs(ArrayList<Uri> uris) {
         if (Build.VERSION.SDK_INT >= 33
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 7);
         }
-        result.setVisibility(View.GONE);
-        work.setVisibility(View.VISIBLE);
-        status.setText("Datei wird übernommen …");
-        bar.setIndeterminate(true);
-        final String name = displayName(uri);
+        if (!TranscribeService.STATE.running) {
+            result.setVisibility(View.GONE);
+            work.setVisibility(View.VISIBLE);
+            status.setText(uris.size() > 1 ? uris.size() + " Dateien werden übernommen …" : "Datei wird übernommen …");
+            progressText.setText("");
+            bar.setIndeterminate(true);
+        } else {
+            Toast.makeText(this, uris.size() + " zur Warteschlange hinzugefügt", Toast.LENGTH_SHORT).show();
+        }
         new Thread(() -> {
-            try {
-                File dir = new File(getFilesDir(), "jobs");
-                dir.mkdirs();
-                File out = new File(dir, "audio-" + System.currentTimeMillis());
-                try (InputStream in = getContentResolver().openInputStream(uri);
-                     OutputStream os = new FileOutputStream(out)) {
-                    if (in == null) throw new Exception("Datei nicht lesbar");
-                    byte[] buf = new byte[64 * 1024];
-                    int n;
-                    while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
+            File dir = new File(getFilesDir(), "jobs");
+            dir.mkdirs();
+            int failed = 0;
+            for (int k = 0; k < uris.size(); k++) {
+                Uri uri = uris.get(k);
+                try {
+                    String name = displayName(uri);
+                    File out = new File(dir, "audio-" + System.currentTimeMillis() + "-" + k);
+                    try (InputStream in = getContentResolver().openInputStream(uri);
+                         OutputStream os = new FileOutputStream(out)) {
+                        if (in == null) throw new Exception("Datei nicht lesbar");
+                        byte[] buf = new byte[64 * 1024];
+                        int n;
+                        while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
+                    }
+                    runOnUiThread(() -> startForegroundService(new Intent(this, TranscribeService.class)
+                            .putExtra(TranscribeService.EXTRA_FILE, out.getPath())
+                            .putExtra(TranscribeService.EXTRA_NAME, name)));
+                } catch (Exception e) {
+                    failed++;
                 }
-                runOnUiThread(() -> startForegroundService(new Intent(this, TranscribeService.class)
-                        .putExtra(TranscribeService.EXTRA_FILE, out.getPath())
-                        .putExtra(TranscribeService.EXTRA_NAME, name)));
-            } catch (Exception e) {
-                runOnUiThread(() -> {
-                    status.setText("Die Datei konnte nicht übernommen werden: " + e.getMessage());
+            }
+            final int f = failed;
+            if (f > 0) runOnUiThread(() -> {
+                Toast.makeText(this, f + " Datei(en) konnten nicht übernommen werden", Toast.LENGTH_LONG).show();
+                if (f == uris.size() && !TranscribeService.STATE.running) {
+                    status.setText("Die Datei konnte nicht übernommen werden.");
                     bar.setIndeterminate(false);
                     bar.setProgress(0);
-                });
-            }
+                }
+            });
         }).start();
     }
 
@@ -218,6 +238,8 @@ public class MainActivity extends Activity implements TranscribeService.Listener
         status.setText(s.status);
         status.setTextColor(getColor(s.error ? R.color.err : android.R.color.white));
         meta.setText(s.meta);
+        progressText.setText(s.progress);
+        progressText.setVisibility(s.progress == null || s.progress.isEmpty() ? View.GONE : View.VISIBLE);
         bar.setIndeterminate(s.running && s.percent < 0);
         bar.setProgress(Math.max(0, s.percent));
         findViewById(R.id.cancel).setVisibility(s.running ? View.VISIBLE : View.GONE);

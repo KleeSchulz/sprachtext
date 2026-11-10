@@ -19,6 +19,19 @@ final class Store {
     static String lang(Context c) { return p(c).getString("lang", "de"); }
     static void lang(Context c, String v) { p(c).edit().putString("lang", v).apply(); }
 
+    /** Gelernte Geschwindigkeit: Rechensekunden pro Sekunde Sprache, je Modell. */
+    static double speed(Context c, String model) {
+        float v = p(c).getFloat("speed_" + model, -1f);
+        return v > 0 ? v : Models.DEFAULT_SPEED[Models.index(model)];
+    }
+
+    static void learnSpeed(Context c, String model, double measured) {
+        if (measured <= 0 || Double.isNaN(measured)) return;
+        float old = p(c).getFloat("speed_" + model, -1f);
+        double v = old > 0 ? old * 0.6 + measured * 0.4 : measured; // gleitender Mittelwert
+        p(c).edit().putFloat("speed_" + model, (float) v).apply();
+    }
+
     static JSONArray history(Context c) {
         try { return new JSONArray(p(c).getString("history", "[]")); }
         catch (Exception e) { return new JSONArray(); }
