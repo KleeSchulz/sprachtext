@@ -61,6 +61,9 @@ jobs:
         run: |
           mkdir -p /tmp/out
           set -o pipefail
+          # Gewichte liegen als bfloat16 vor – das Skript braucht float32 (numpy kennt kein bfloat16)
+          sed -i 's/\.squeeze()\.numpy()/.squeeze().float().numpy()/' /tmp/whisper.cpp/models/convert-h5-to-ggml.py
+          grep -n "float().numpy()" /tmp/whisper.cpp/models/convert-h5-to-ggml.py
           ls -la /tmp/hf-model | tee /tmp/step.log
           python /tmp/whisper.cpp/models/convert-h5-to-ggml.py /tmp/hf-model /tmp/openai-whisper /tmp/out 2>&1 | tail -n 60 | tee -a /tmp/step.log
           ls -la /tmp/out | tee -a /tmp/step.log
