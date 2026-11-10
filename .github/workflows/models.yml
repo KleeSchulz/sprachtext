@@ -1,0 +1,71 @@
+name: Modelle bauen
+
+# Wandelt deutsch trainierte Whisper-Modelle ins whisper.cpp-Format um,
+# komprimiert sie und stellt sie als Release "models" zum Download bereit.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/models.yml
+
+permissions:
+  contents: write
+
+jobs:
+  turbo-german:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Platz schaffen
+        run: sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL || true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Werkzeuge installieren
+        run: |
+          pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu
+          pip install --quiet transformers safetensors numpy "huggingface_hub[cli]"
+          git clone --depth 1 https://github.com/openai/whisper /tmp/openai-whisper
+          git clone --depth 1 --branch v1.9.5 https://github.com/ggml-org/whisper.cpp /tmp/whisper.cpp
+
+      - name: Quantisierer bauen
+        run: |
+          cd /tmp/whisper.cpp
+          cmake -B build -DCMAKE_BUILD_TYPE=Release -DWHISPER_BUILD_EXAMPLES=ON -DWHISPER_BUILD_TESTS=OFF -DWHISPER_SDL2=OFF
+          cmake --build build --target whisper-quantize -j 4
+
+      - name: Modell herunterladen (primeline/whisper-large-v3-turbo-german)
+        run: |
+          huggingface-cli download primeline/whisper-large-v3-turbo-german --local-dir /tmp/hf-model
+          ls -la /tmp/hf-model
+          cd /tmp/hf-model
+          # Das Konvertierungsskript braucht vocab.json und added_tokens.json
+          python - <<'EOF'
+          import json, os
+          from transformers import WhisperTokenizer
+          tok = WhisperTokenizer.from_pretrained(".")
+          if not os.path.exists("vocab.json"):
+              json.dump(tok.get_vocab(), open("vocab.json", "w", encoding="utf8"), ensure_ascii=False)
+          if not os.path.exists("added_tokens.json"):
+              json.dump(tok.get_added_vocab(), open("added_tokens.json", "w", encoding="utf8"), ensure_ascii=False)
+          print("tokens ok")
+          EOF
+
+      - name: In ggml umwandeln und komprimieren (q5_0)
+        run: |
+          mkdir -p /tmp/out
+          python /tmp/whisper.cpp/models/convert-h5-to-ggml.py /tmp/hf-model /tmp/openai-whisper /tmp/out
+          ls -la /tmp/out
+          /tmp/whisper.cpp/build/bin/whisper-quantize /tmp/out/ggml-model.bin /tmp/out/ggml-large-v3-turbo-german-q5_0.bin q5_0
+          ls -la /tmp/out
+
+      - name: Als Release "models" bereitstellen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view models --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create models --repo "$GITHUB_REPOSITORY" --title "Modelle" \
+              --notes "Whisper-Modelle für Sprachtext (whisper.cpp-Format). Basis: primeline/whisper-large-v3-turbo-german."
+          gh release upload models /tmp/out/ggml-large-v3-turbo-german-q5_0.bin --repo "$GITHUB_REPOSITORY" --clobber
+          echo "::notice::Modell hochgeladen: $(stat -c %s /tmp/out/ggml-large-v3-turbo-german-q5_0.bin) Bytes"
