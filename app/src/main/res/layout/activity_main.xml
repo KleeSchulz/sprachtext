@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:fillViewport="true">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sprachtext"
+            android:textSize="26sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Sprachnachricht in WhatsApp teilen → hier als Text"
+            android:textColor="@color/muted" />
+
+        <TextView
+            android:id="@+id/cpuWarn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textColor="@color/err"
+            android:visibility="gone" />
+
+        <!-- Eingabe -->
+        <LinearLayout style="@style/Card">
+            <Button
+                android:id="@+id/pick"
+                style="@style/BtnPrimary"
+                android:layout_width="match_parent"
+                android:text="Audiodatei wählen" />
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:text="Oder in WhatsApp: Sprachnachricht gedrückt halten → Teilen → Sprachtext"
+                android:textColor="@color/muted"
+                android:textSize="13sp" />
+        </LinearLayout>
+
+        <!-- Fortschritt -->
+        <LinearLayout
+            android:id="@+id/work"
+            style="@style/Card"
+            android:visibility="gone">
+            <TextView
+                android:id="@+id/status"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textSize="16sp" />
+            <ProgressBar
+                android:id="@+id/bar"
+                style="@android:style/Widget.Material.ProgressBar.Horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:max="100"
+                android:progressTint="@color/accent" />
+            <TextView
+                android:id="@+id/meta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:textColor="@color/muted"
+                android:textSize="13sp" />
+            <TextView
+                android:id="@+id/partial"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:textColor="@color/muted"
+                android:visibility="gone" />
+            <Button
+                android:id="@+id/cancel"
+                style="@style/Btn"
+                android:layout_width="wrap_content"
+                android:layout_marginTop="10dp"
+                android:paddingHorizontal="20dp"
+                android:text="Abbrechen" />
+        </LinearLayout>
+
+        <!-- Ergebnis -->
+        <LinearLayout
+            android:id="@+id/result"
+            style="@style/Card"
+            android:visibility="gone">
+            <EditText
+                android:id="@+id/text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/field"
+                android:gravity="top"
+                android:minLines="5"
+                android:padding="12dp"
+                android:textColor="#e8efe9"
+                android:textIsSelectable="true"
+                android:textSize="16sp" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal">
+                <Button
+                    android:id="@+id/copy"
+                    style="@style/BtnPrimary"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:text="Kopieren" />
+                <Space
+                    android:layout_width="10dp"
+                    android:layout_height="1dp" />
+                <Button
+                    android:id="@+id/share"
+                    style="@style/Btn"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:text="Teilen" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- Einstellungen -->
+        <LinearLayout style="@style/Card">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Einstellungen"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+            <TextView style="@style/Label" android:text="Modell" />
+            <Spinner
+                android:id="@+id/model"
+                android:layout_width="match_parent"
+                android:layout_height="48dp" />
+            <TextView style="@style/Label" android:text="Sprache" />
+            <Spinner
+                android:id="@+id/lang"
+                android:layout_width="match_parent"
+                android:layout_height="48dp" />
+            <TextView
+                android:id="@+id/info"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:textColor="@color/muted"
+                android:textSize="12sp" />
+        </LinearLayout>
+
+        <!-- Verlauf -->
+        <LinearLayout
+            android:id="@+id/historyBox"
+            style="@style/Card"
+            android:visibility="gone">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Verlauf"
+                android:textSize="17sp"
+                android:textStyle="bold" />
+            <LinearLayout
+                android:id="@+id/history"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+            <Button
+                android:id="@+id/clearHist"
+                style="@style/Btn"
+                android:layout_width="wrap_content"
+                android:layout_marginTop="10dp"
+                android:paddingHorizontal="20dp"
+                android:text="Verlauf löschen" />
+        </LinearLayout>
+    </LinearLayout>
+</ScrollView>
